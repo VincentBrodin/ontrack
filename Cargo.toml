@@ -1,0 +1,29 @@
+[package]
+version = "0.0.1"
+name = "ontrack"
+description = "Rust implementation of Trafiklab’s ResRobot journey planner for Sweden, providing fast and flexible public transport routing and journey planning."
+authors = ["Vincent Brodin <vincent.brodin21@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/VincentBrodin/ontrack"
+edition = "2024"
+keywords = ["SDK", "SL", "ResRobot", "GTFS"]
+
+[workspace]
+members = [
+    "crates/server",
+]
+resolver = "1"
+
+[workspace.dependencies]
+ontrack = { path = "." }
+
+[features]
+
+[dependencies]
+csv = "1.4.0"
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.17"
+zip = "6.0.0"
+
+[dev-dependencies]
