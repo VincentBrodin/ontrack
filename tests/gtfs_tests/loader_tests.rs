@@ -1,10 +1,9 @@
-use ontrack::gtfs;
+use ontrack::{engine::Stop, gtfs};
 
 #[test]
 fn load_from_zip_test() {
     let zip_path = format!("{}/tests/gtfs3.zip", env!("CARGO_MANIFEST_DIR"));
-    let config = gtfs::Config::default();
-    let loader = gtfs::GtfsLoader::new(config)
+    let loader = gtfs::Gtfs::new(gtfs::Config::default())
         .load_from_zip(zip_path)
         .unwrap();
 
@@ -18,6 +17,7 @@ fn load_from_zip_test() {
         if stop.stop_name.is_empty() {
             panic!("stop_name should never be null");
         }
+        let _ = Stop::from(stop.clone());
     }
 
     if loader.areas().is_empty() {

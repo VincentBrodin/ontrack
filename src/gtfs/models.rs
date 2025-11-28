@@ -1,18 +1,18 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GtfsStop {
     pub stop_id: String,
     pub stop_name: String,
     pub stop_lat: f64,
     pub stop_lon: f64,
-    pub location_type: i32,
+    pub location_type: Option<u8>,
     pub parent_station: Option<String>,
     pub platform_code: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GtfsArea {
     pub area_id: String,
@@ -20,7 +20,7 @@ pub struct GtfsArea {
     pub samtrafiken_area_type: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GtfsRoute {
     pub route_id: String,
@@ -31,7 +31,7 @@ pub struct GtfsRoute {
     pub route_desc: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GtfsAgency {
     pub agency_id: String,
@@ -42,14 +42,14 @@ pub struct GtfsAgency {
     pub agency_fare_url: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GtfsStopArea {
     pub area_id: String,
     pub stop_id: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GtfsTransfer {
     pub from_stop_id: String,
