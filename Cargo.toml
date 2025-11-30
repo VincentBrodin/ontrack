@@ -1,7 +1,7 @@
 [package]
 version = "0.0.2"
 name = "ontrack"
-description = "Rust implementation of Trafiklab’s ResRobot journey planner for Sweden, providing fast and flexible public transport routing and journey planning."
+description = "High-performance Rust library for routing, searching, and querying GTFS transit data with minimal runtime allocations."
 authors = ["Vincent Brodin <vincent.brodin21@gmail.com>"]
 license = "MIT"
 readme = "README.md"
