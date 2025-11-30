@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use crate::{engine::Identifiable, gtfs::models::GtfsStop};
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub enum LocationType {
+    #[default]
     Stop,
     Platform {
         parent_station: Arc<str>,
@@ -15,7 +16,7 @@ pub enum LocationType {
     Boarding,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct Stop {
     pub id: Arc<str>,
     pub name: Arc<str>,

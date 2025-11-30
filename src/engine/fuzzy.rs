@@ -42,7 +42,43 @@ pub fn distance(s1_in: &str, s2_in: &str) -> usize {
     matrix[s1_len][s2_len]
 }
 
-pub fn score(s1: &str, s2: &str) -> f64 {
+pub fn score(needle: &str, hay: &str) -> f64 {
+    let needle_tokens: Vec<_> = needle.split_whitespace().collect();
+    let hay_tokens: Vec<_> = hay.split_whitespace().collect();
+    let tokens = needle_tokens.len();
+    let runs = cmp::min(needle_tokens.len(), hay_tokens.len());
+    let mut score: f64 = 0.0;
+    for i in 0..runs {
+        score += score_inner(needle_tokens[i], hay_tokens[i]);
+    }
+
+    if score == 0.0 {
+        0.0
+    } else {
+        score / tokens as f64
+    }
+}
+
+pub fn score_deep(needle: &str, hay: &str) -> f64 {
+    let needle_tokens: Vec<_> = needle.split_whitespace().collect();
+    let hay_tokens: Vec<_> = hay.split_whitespace().collect();
+    let tokens = needle_tokens.len();
+    let runs = cmp::min(needle_tokens.len(), hay_tokens.len());
+    let mut score: f64 = 0.0;
+    for i in 0..runs {
+        score += score_inner(needle_tokens[i], hay_tokens[i]);
+    }
+
+    score = if score == 0.0 {
+        0.0
+    } else {
+        score / tokens as f64
+    };
+    score += score_inner(needle, hay);
+    if score == 0.0 { 0.0 } else { score / 2.0 }
+}
+
+fn score_inner(s1: &str, s2: &str) -> f64 {
     let dist = distance(s1, s2);
     if dist == 0 {
         1.0

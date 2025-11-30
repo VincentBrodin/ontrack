@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{engine::Identifiable, gtfs::models::GtfsArea};
 
+#[derive(Debug, Default, Clone)]
 pub struct Area {
     pub id: Arc<str>,
     pub name: Arc<str>,

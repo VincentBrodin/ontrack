@@ -1,18 +1,15 @@
-use std::{cmp, collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 mod area;
 pub mod fuzzy;
 mod stop;
 pub use area::*;
-use rayon::{
-    iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator},
-    slice::{ParallelSlice, ParallelSliceMut},
-};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 pub use stop::*;
 
 use crate::gtfs::Gtfs;
 
-trait Identifiable {
+pub trait Identifiable {
     fn id(&self) -> &str;
     fn name(&self) -> &str;
 }
@@ -29,7 +26,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new() -> Self {
-        Self::default()
+        Default::default()
     }
 
     pub fn with_gtfs(mut self, gtfs: Gtfs) -> Self {
@@ -138,35 +135,12 @@ where
             if index > haystack.len() - 1 {
                 break;
             }
-            let entity = &haystack[index];
-            // let score = fuzzy::score(entity.name(), needle);
-            // vec.push((entity, score));
-            vec.push((entity, 0.0));
+            let hay = &haystack[index];
+            let score = fuzzy::score(needle, hay.name());
+            vec.push((hay, score));
         }
     });
     let mut results: Vec<_> = results.into_iter().flatten().collect();
     results.sort_by(|(_, score_a), (_, score_b)| score_b.total_cmp(score_a));
     results.iter().map(|(entity, _)| *entity).collect()
-}
-
-fn search_v2<'a, T>(needle: &str, haystack: &'a [T]) -> Vec<&'a T>
-where
-    T: Send + Sync + Identifiable,
-{
-    let threads = rayon::current_num_threads();
-    let chunk_size = haystack.len().div_ceil(threads);
-    let mut results: Vec<(&T, f64)> = vec![(&haystack[0], 0.0); haystack.len()];
-    results.par_chunks_mut(chunk_size).enumerate().for_each(
-        |(idx, slice): (usize, &mut [(&T, f64)])| {
-            let slice_len = slice.len();
-            for (i, slot) in slice.iter_mut().enumerate() {
-                let index = idx * slice_len + i;
-                let entity = &haystack[index];
-                // *slot = (entity, fuzzy::score(entity.name(), needle));
-                *slot = (entity, 0.0);
-            }
-        },
-    );
-    results.sort_by(|(_, a), (_, b)| b.total_cmp(a));
-    results.into_iter().map(|(e, _)| e).collect()
 }
