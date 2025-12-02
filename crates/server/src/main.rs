@@ -19,6 +19,7 @@ fn main() {
         .unwrap();
     let engine = engine::Engine::new().with_gtfs(data);
 
+    dbg!(engine.get_stop("9022050010353002").unwrap());
     let start = Instant::now();
     let results = engine.search_areas_by_name(&args[2]);
     for value in results.iter().take(5) {

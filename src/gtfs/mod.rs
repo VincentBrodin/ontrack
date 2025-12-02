@@ -9,7 +9,7 @@ use thiserror::Error;
 mod config;
 pub mod models;
 pub use config::*;
-use models::{GtfsAgency, GtfsArea, GtfsRoute, GtfsStop, GtfsStopArea, GtfsTransfer};
+use models::{GtfsAgency, GtfsArea, GtfsRoute, GtfsStop, GtfsStopArea, GtfsStopTime, GtfsTransfer};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -32,6 +32,7 @@ pub struct Gtfs {
     pub(crate) agency: Vec<GtfsAgency>,
     pub(crate) stop_areas: Vec<GtfsStopArea>,
     pub(crate) transfers: Vec<GtfsTransfer>,
+    pub(crate) stop_times: Vec<GtfsStopTime>,
     config: Config,
 }
 
@@ -44,6 +45,7 @@ impl Gtfs {
             agency: Default::default(),
             stop_areas: Default::default(),
             transfers: Default::default(),
+            stop_times: Default::default(),
             config,
         }
     }
@@ -68,6 +70,9 @@ impl Gtfs {
                 }
                 val if val == self.config.transfers_file_name => {
                     parse_csv(&mut self.transfers, &mut file)?
+                }
+                val if val == self.config.stop_times_file_name => {
+                    parse_csv(&mut self.stop_times, &mut file)?
                 }
                 _ => {
                     #[cfg(debug_assertions)]
@@ -96,6 +101,10 @@ impl Gtfs {
     }
     pub fn transfers(&self) -> &Vec<GtfsTransfer> {
         &self.transfers
+    }
+
+    pub fn stop_times(&self) -> &Vec<GtfsStopTime> {
+        &self.stop_times
     }
 }
 

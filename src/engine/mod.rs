@@ -1,11 +1,14 @@
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 use std::{collections::HashMap, sync::Arc};
 
-mod area;
 pub mod fuzzy;
+
+mod area;
 mod stop;
+mod stop_time;
 pub use area::*;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 pub use stop::*;
+pub use stop_time::*;
 
 use crate::gtfs::Gtfs;
 

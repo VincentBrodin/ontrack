@@ -5,6 +5,7 @@ pub struct Config {
     pub agency_file_name: String,
     pub stop_areas_file_name: String,
     pub transfers_file_name: String,
+    pub stop_times_file_name: String,
 }
 
 impl Default for Config {
@@ -16,6 +17,7 @@ impl Default for Config {
             agency_file_name: "agency.txt".into(),
             stop_areas_file_name: "stop_areas.txt".into(),
             transfers_file_name: "transfers.txt".into(),
+            stop_times_file_name: "stop_times.txt".into(),
         }
     }
 }

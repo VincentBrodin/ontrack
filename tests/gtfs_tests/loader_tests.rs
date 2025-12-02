@@ -95,4 +95,22 @@ fn load_from_zip_test() {
             panic!("transfer_type should never be null");
         }
     }
+
+    if loader.stop_times().is_empty() {
+        panic!("stop_times should not be empty");
+    }
+    for transfer in loader.stop_times().iter() {
+        if transfer.trip_id.is_empty() {
+            panic!("trip_id should never be null");
+        }
+        if transfer.arrival_time.is_empty() {
+            panic!("arrival_time should never be null");
+        }
+        if transfer.departure_time.is_empty() {
+            panic!("departure_time should never be null");
+        }
+        if transfer.stop_id.is_empty() {
+            panic!("stop_id should never be null");
+        }
+    }
 }

@@ -59,3 +59,20 @@ pub struct GtfsTransfer {
     pub from_trip_id: Option<String>,
     pub to_trip_id: Option<String>,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct GtfsStopTime {
+    pub trip_id: String,
+    pub arrival_time: String,
+    pub departure_time: String,
+    pub stop_id: String,
+    pub stop_sequence: i64,
+    pub stop_headsign: Option<String>,
+    pub pickup_type: u8,
+    pub drop_off_type: u8,
+    pub shape_dist_traveled: Option<f64>,
+    pub timepoint: Option<u8>,
+    pub pickup_booking_rule_id: Option<String>,
+    pub drop_off_booking_rule_id: Option<String>,
+}
