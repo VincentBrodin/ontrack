@@ -1,4 +1,4 @@
-![ontrack](./assets/ontrack_github.png)
+![ontrack](./assets/ontrack_slim.png)
 
 On Track is a high-performance Rust library for loading, routing, searching, and querying GTFS transit data,
 designed for minimal runtime allocations and fast lookups.
