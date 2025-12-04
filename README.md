@@ -42,9 +42,9 @@ fn main() {
 
     // The gtfs module is used to read and parse gtfs data into in memory structs.
     // The structs that are held in the gtfs are supposed to be identical to the ones found in the gtfs spec.
-    // We don't load the data until a load_from function is called.
+    // The Gtfs struct never loads any data on it's own, it only loads the data when it's being fetched by the engine.
     let data = gtfs::Gtfs::new(gtfs::Config::default())
-        .load_from_zip(path)
+        .from_zip(path)
         .unwrap();
 
 
