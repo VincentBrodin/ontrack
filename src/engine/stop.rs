@@ -16,13 +16,18 @@ pub enum LocationType {
     Boarding,
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Coordinate {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Stop {
     pub id: Arc<str>,
     pub name: Arc<str>,
     pub normalized_name: Arc<str>,
-    pub latitude: f64,
-    pub longitude: f64,
+    pub coordinate: Coordinate,
     pub location_type: LocationType,
 }
 
@@ -66,8 +71,10 @@ impl From<GtfsStop> for Stop {
             id: value.stop_id.into(),
             name: value.stop_name.clone().into(),
             normalized_name: value.stop_name.to_lowercase().into(),
-            latitude: value.stop_lat,
-            longitude: value.stop_lon,
+            coordinate: Coordinate {
+                latitude: value.stop_lat,
+                longitude: value.stop_lon,
+            },
             location_type,
         }
     }

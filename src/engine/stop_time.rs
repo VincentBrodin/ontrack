@@ -20,6 +20,7 @@ pub enum StopAccessType {
 
 #[derive(Debug, Default, Clone)]
 pub struct StopTime {
+    pub trip_id: Arc<str>,
     pub index: i64,
     pub arrival_time: Arc<str>,
     pub departure_time: Arc<str>,
@@ -33,11 +34,12 @@ pub struct StopTime {
 impl From<GtfsStopTime> for StopTime {
     fn from(value: GtfsStopTime) -> Self {
         Self {
+            trip_id: Default::default(),
             index: value.stop_sequence,
             arrival_time: value.arrival_time.into(),
             departure_time: value.departure_time.into(),
             headsign: value.stop_headsign.map(|val| val.into()),
-            dist_traveled: value.shape_dist_traveled.into(),
+            dist_traveled: value.shape_dist_traveled,
             pickup_type: StopAccessType::Regularly,
             drop_off_type: StopAccessType::Regularly,
             timepoint: Timepoint::Exact,

@@ -28,8 +28,6 @@ fn main() {
     let duration = start.elapsed();
     println!("Loading took: {:?}", duration);
 
-    dbg!(engine.stop_by_id("9022050010353002").unwrap());
-
     let mut buf = String::new();
     loop {
         print!("Search: ");
@@ -40,9 +38,32 @@ fn main() {
         let start = Instant::now();
         let results = engine.search_areas_by_name(search_str);
         let duration = start.elapsed();
-        for value in results.iter().take(5) {
-            println!("{}", value.name());
-        }
+        results.iter().take(5).for_each(|area| {
+            println!("{}", area.name());
+            let stops = engine.stops_by_area_id(&area.id).unwrap_or_default();
+            // dbg!(&stops);
+            stops.iter().for_each(|stop| {
+                println!("  {}", stop.id);
+                match &stop.location_type {
+                    engine::LocationType::Stop => println!("  stop"),
+                    engine::LocationType::Platform {
+                        parent_station,
+                        platform_code,
+                    } => println!("  platform"),
+                    engine::LocationType::Station => println!(" station"),
+                    engine::LocationType::Entrance(_) => println!(" entrance"),
+                    engine::LocationType::Node => println!("  node"),
+                    engine::LocationType::Boarding => println!("  boarding"),
+                }
+                let trips = engine.trips_by_stop_id(&stop.id).unwrap_or_default();
+                // dbg!(&trips);
+                trips.iter().for_each(|trip| {
+                    if let Some(headsign) = &trip.headsign {
+                        println!("  {headsign}");
+                    }
+                });
+            });
+        });
         println!("Search took: {:?}", duration);
         buf.clear();
     }

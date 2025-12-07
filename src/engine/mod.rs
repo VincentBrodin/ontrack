@@ -1,5 +1,5 @@
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, f64::consts::PI, sync::Arc};
 
 pub mod fuzzy;
 
@@ -20,6 +20,11 @@ pub trait Identifiable {
     fn normalized_name(&self) -> &str;
 }
 
+type IdToIndex = Arc<HashMap<Arc<str>, usize>>;
+type IdToId = Arc<HashMap<Arc<str>, Arc<str>>>;
+type IdToIndexes = Arc<HashMap<Arc<str>, Arc<[usize]>>>;
+type IdToIds = Arc<HashMap<Arc<str>, Arc<[Arc<str>]>>>;
+
 #[derive(Clone, Default)]
 pub struct Engine {
     stops: Arc<[Stop]>,
@@ -28,11 +33,13 @@ pub struct Engine {
     stop_times: Arc<[StopTime]>,
 
     // Lookup tables
-    stop_lookup: Arc<HashMap<Arc<str>, usize>>,
-    area_lookup: Arc<HashMap<Arc<str>, usize>>,
-    trip_lookup: Arc<HashMap<Arc<str>, usize>>,
-    area_to_stops: Arc<HashMap<Arc<str>, Vec<Arc<str>>>>,
-    stop_to_area: Arc<HashMap<Arc<str>, Arc<str>>>,
+    stop_lookup: IdToIndex,
+    area_lookup: IdToIndex,
+    trip_lookup: IdToIndex,
+    trip_to_stop_times: IdToIndexes,
+    stop_to_trips: IdToIds,
+    area_to_stops: IdToIds,
+    stop_to_area: IdToId,
 }
 
 impl Engine {
@@ -77,12 +84,43 @@ impl Engine {
         self.trip_lookup = trip_lookup.into();
 
         // Build stop_time data set
+        let mut trip_to_stop_times: HashMap<Arc<str>, Vec<usize>> = HashMap::new();
+        let mut stop_to_trips: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
         let mut stop_times: Vec<StopTime> = Vec::new();
-        gtfs.stream_stop_times(|(_, stop_time)| {
-            let value: StopTime = stop_time.into();
+        gtfs.stream_stop_times(|(i, stop_time)| {
+            // TEMP
+            let trip_index = self.trip_lookup.get(stop_time.trip_id.as_str()).unwrap();
+            let trip = &self.trips[*trip_index];
+
+            // TEMP
+            let stop_index = self.stop_lookup.get(stop_time.stop_id.as_str()).unwrap();
+            let stop = &self.stops[*stop_index];
+
+            let mut value: StopTime = stop_time.into();
+            value.trip_id = trip.id.clone();
             stop_times.push(value);
+
+            trip_to_stop_times
+                .entry(trip.id.clone())
+                .or_default()
+                .push(i);
+            stop_to_trips
+                .entry(stop.id.clone())
+                .or_default()
+                .push(trip.id.clone());
         })?;
         self.stop_times = stop_times.into();
+        let trip_to_stop_times: HashMap<Arc<str>, Arc<[usize]>> = trip_to_stop_times
+            .into_iter()
+            .map(|(key, value)| (key, value.into()))
+            .collect();
+        self.trip_to_stop_times = trip_to_stop_times.into();
+
+        let stop_to_trips: HashMap<Arc<str>, Arc<[Arc<str>]>> = stop_to_trips
+            .into_iter()
+            .map(|(key, value)| (key, value.into()))
+            .collect();
+        self.stop_to_trips = stop_to_trips.into();
 
         // Build stop_area data set
         let mut area_to_stops: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
@@ -101,6 +139,10 @@ impl Engine {
             }
         })?;
         self.stop_to_area = stop_to_area.into();
+        let area_to_stops: HashMap<Arc<str>, Arc<[Arc<str>]>> = area_to_stops
+            .into_iter()
+            .map(|(key, value)| (key, value.into()))
+            .collect();
         self.area_to_stops = area_to_stops.into();
 
         Ok(self)
@@ -129,6 +171,27 @@ impl Engine {
     pub fn area_by_stop_id(&self, stop_id: &str) -> Option<&Area> {
         let area_id = self.stop_to_area.get(stop_id)?;
         self.area_by_id(area_id)
+    }
+
+    pub fn trip_by_id(&self, id: &str) -> Option<&Trip> {
+        let trip_index = self.trip_lookup.get(id)?;
+        Some(&self.trips[*trip_index])
+    }
+
+    pub fn trips_by_stop_id(&self, stop_id: &str) -> Option<Vec<&Trip>> {
+        let trips = self.stop_to_trips.get(stop_id)?;
+        println!("Found {} trips", trips.len());
+        Some(
+            trips
+                .iter()
+                .filter_map(|trip_id| self.trip_by_id(trip_id))
+                .collect(),
+        )
+    }
+
+    pub fn stop_times_by_trip_id(&self, trip_id: &str) -> Option<Vec<&StopTime>> {
+        let stop_times = self.trip_to_stop_times.get(trip_id)?;
+        Some(stop_times.iter().map(|i| &self.stop_times[*i]).collect())
     }
 
     pub fn search_areas_by_name<'a>(&'a self, needle: &'a str) -> Vec<&'a Area> {
@@ -165,4 +228,21 @@ where
     let mut results: Vec<_> = results.into_iter().flatten().collect();
     results.sort_by(|(_, score_a), (_, score_b)| score_b.total_cmp(score_a));
     results.iter().map(|(entity, _)| *entity).collect()
+}
+
+pub fn distance(coord_a: Coordinate, coord_b: Coordinate) -> f64 {
+    const R: f64 = 6371.0;
+    let dist_lat = deg2rad(coord_b.latitude - coord_a.latitude);
+    let dist_lon = deg2rad(coord_b.longitude - coord_a.longitude);
+    let a = f64::powi(f64::sin(dist_lat / 2.0), 2)
+        + f64::cos(deg2rad(coord_a.latitude))
+            * f64::cos(deg2rad(coord_b.latitude))
+            * f64::sin(dist_lon / 2.0)
+            * f64::sin(dist_lon / 2.0);
+    let c = 2.0 * f64::atan2(f64::sqrt(a), f64::sqrt(1.0 - a));
+    R * c
+}
+
+fn deg2rad(deg: f64) -> f64 {
+    deg * (PI / 180.0)
 }
