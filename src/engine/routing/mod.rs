@@ -197,8 +197,8 @@ impl Router {
                                 let tran_node =
                                     Node::from_transfer(&node, tran_stop, transfer, &self.end);
                                 let cost = tran_node.cost();
-                                if cost < self.best_cost[stop.index] {
-                                    self.best_cost[stop.index] = cost;
+                                if cost < self.best_cost[tran_stop.index] {
+                                    self.best_cost[tran_stop.index] = cost;
                                     let t_node: NodeRef = tran_node.into();
                                     self.heap.push(t_node);
                                 }
@@ -213,7 +213,7 @@ impl Router {
                 let stop = &self.engine.stops[from_node.stop_idx.unwrap()];
                 self.engine
                     .trips_by_stop_id(&stop.id)
-                    .unwrap()
+                    .unwrap_or_default()
                     .into_iter()
                     .filter_map(|trip| self.engine.stop_times_by_trip_id(&trip.id))
                     .for_each(|stop_times| {
@@ -225,12 +225,32 @@ impl Router {
                                 // TEMP should never happend tho
                                 let stop = self.engine.stop_by_id(&stop_time.stop_id).unwrap();
                                 let node =
-                                    Node::from_stop_time(&self.start, stop, stop_time, &self.end);
+                                    Node::from_stop_time(from_node, stop, stop_time, &self.end);
 
                                 let cost = node.cost();
                                 if cost < self.best_cost[stop.index] {
                                     self.best_cost[stop.index] = cost;
-                                    self.heap.push(node.into());
+                                    let node: NodeRef = node.into();
+                                    self.heap.push(node.clone());
+
+                                    // We also want to explore transfers
+                                    if let Some(transfers) =
+                                        self.engine.transfers_by_stop_id(&stop_time.stop_id)
+                                    {
+                                        transfers.iter().for_each(|transfer| {
+                                            let tran_stop =
+                                                &self.engine.stops[transfer.to_stop_idx];
+                                            let tran_node = Node::from_transfer(
+                                                &node, tran_stop, transfer, &self.end,
+                                            );
+                                            let cost = tran_node.cost();
+                                            if cost < self.best_cost[tran_stop.index] {
+                                                self.best_cost[tran_stop.index] = cost;
+                                                let t_node: NodeRef = tran_node.into();
+                                                self.heap.push(t_node);
+                                            }
+                                        });
+                                    }
                                 }
                                 break;
                             }
@@ -243,9 +263,13 @@ impl Router {
                 to_trip_idx,
             } => {
                 if let Some(to_trip_idx) = to_trip_idx {
+                    // println!("T_T");
                     // Here we can just start by traveling down the trip
                     let trip = &self.engine.trips[to_trip_idx];
-                    let stop_times = self.engine.stop_times_by_trip_id(&trip.id).unwrap();
+                    let stop_times = self
+                        .engine
+                        .stop_times_by_trip_id(&trip.id)
+                        .unwrap_or_default();
                     let mut sequence = usize::MAX;
                     // Find the current sequence id
                     for stop_time in stop_times.iter() {
@@ -261,7 +285,7 @@ impl Router {
                             continue;
                         }
                         let stop = &self.engine.stops[stop_time.stop_idx];
-                        let node = Node::from_stop_time(&from_node, stop, stop_time, &self.end);
+                        let node = Node::from_stop_time(from_node, stop, stop_time, &self.end);
                         let cost = node.cost();
                         // If it's worth to explore it
                         if cost < self.best_cost[stop.index] {
@@ -272,8 +296,41 @@ impl Router {
                         break;
                     }
                 } else {
-                    // Here we need to find a trip
-                    println!("WE GOT A NON ISH TRIP")
+                    // println!("T_S");
+                    let stop = &self.engine.stops[to_stop_idx];
+                    self.engine
+                        .trips_by_stop_id(&stop.id)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|trip| self.engine.stop_times_by_trip_id(&trip.id))
+                        .for_each(|stop_times| {
+                            let mut sequence = usize::MAX;
+                            // Find the current sequence id
+                            for stop_time in stop_times.iter() {
+                                if stop_time.stop_idx != to_stop_idx {
+                                    continue;
+                                }
+                                sequence = stop_time.sequence;
+                                break;
+                            }
+
+                            for stop_time in stop_times.iter() {
+                                if stop_time.sequence != sequence + 1 {
+                                    continue;
+                                }
+                                let stop = &self.engine.stops[stop_time.stop_idx];
+                                let node =
+                                    Node::from_stop_time(from_node, stop, stop_time, &self.end);
+                                let cost = node.cost();
+                                // If it's worth to explore it
+                                if cost < self.best_cost[stop.index] {
+                                    self.best_cost[stop.index] = cost;
+                                    let node: NodeRef = node.into();
+                                    self.heap.push(node.clone());
+                                }
+                                break;
+                            }
+                        });
                 }
             }
             Transition::Genesis => todo!(),
