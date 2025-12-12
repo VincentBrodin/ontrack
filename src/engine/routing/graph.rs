@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::engine::{
-    Stop, StopTime,
+    Stop, StopTime, Transfer,
     geo::{Coordinate, Distance},
     routing::time_to_walk,
 };
@@ -14,8 +14,9 @@ pub enum Transition {
     },
     Walk,
     Transfer {
-        from_trip_idx: usize,
-        to_trip_idx: usize,
+        from_stop_idx: usize,
+        to_stop_idx: usize,
+        to_trip_idx: Option<usize>,
     },
     Genesis,
 }
@@ -48,6 +49,23 @@ impl Node {
             g_time: from.g_time + time_to_walk,
             h_distance: to.coordinate.distance(&end.coordinate),
             transition: Transition::Walk,
+            parent: Some(from.clone()),
+        }
+    }
+
+    pub fn from_transfer(from: &NodeRef, to: &Stop, transfer: &Transfer, end: &NodeRef) -> Self {
+        Self {
+            stop_idx: Some(to.index),
+            coordinate: to.coordinate,
+            arrival_time: 0,
+            g_distance: from.g_distance + from.coordinate.distance(&to.coordinate),
+            g_time: transfer.min_transfer_time.unwrap_or(0),
+            h_distance: to.coordinate.distance(&end.coordinate),
+            transition: Transition::Transfer {
+                from_stop_idx: transfer.from_stop_idx,
+                to_stop_idx: transfer.to_stop_idx,
+                to_trip_idx: transfer.to_trip_idx,
+            },
             parent: Some(from.clone()),
         }
     }

@@ -127,18 +127,7 @@ impl Router {
 
     pub fn run(&mut self) -> Result<Vec<String>, self::Error> {
         // Find all stops close to the start and set them as possible routes
-        self.engine
-            .stops_by_coordinate(&self.start.coordinate, self.walk_distance)
-            .into_iter()
-            .filter(|stop| self.engine.trips_by_stop_id(&stop.id).is_some())
-            .for_each(|stop| {
-                let node = Node::from_coordinate(&self.start, stop, &self.end);
-                let cost = node.cost();
-                if cost < self.best_cost[stop.index] {
-                    self.best_cost[stop.index] = cost;
-                    self.heap.push(node.into());
-                }
-            });
+        self.add_walk_neigbours(&self.start.clone());
 
         while let Some(node) = self.heap.pop() {
             let distance_to_end = self.end.coordinate.distance(&node.coordinate);
@@ -157,34 +146,71 @@ impl Router {
             // if let Some(stop_idx) = node.stop_idx {
             //     // println!("name: {}", self.engine.stops[stop_idx].name);
             // }
-            self.add_neigbours(node);
+            self.add_neigbours(&node);
+            // if node.transition != Transition::Walk {
+            //     self.add_walk_neigbours(&node);
+            // }
         }
         Err(self::Error::NoRouteFound)
     }
 
-    fn add_neigbours(&mut self, node: NodeRef) {
-        match node.transition {
+    fn add_walk_neigbours(&mut self, node: &NodeRef) {
+        self.engine
+            .stops_by_coordinate(&node.coordinate, self.walk_distance)
+            .into_iter()
+            .filter(|stop| self.engine.trips_by_stop_id(&stop.id).is_some())
+            .for_each(|stop| {
+                let node = Node::from_coordinate(node, stop, &self.end);
+                let cost = node.cost();
+                if cost < self.best_cost[stop.index] {
+                    self.best_cost[stop.index] = cost;
+                    self.heap.push(node.into());
+                }
+            });
+    }
+
+    fn add_neigbours(&mut self, from_node: &NodeRef) {
+        match from_node.transition {
             Transition::Travel { trip_idx, sequence } => {
                 // If we are traveling we will continue down the path
                 let trip = &self.engine.trips[trip_idx];
                 let stop_times = self.engine.stop_times_by_trip_id(&trip.id).unwrap();
                 for stop_time in stop_times {
-                    if stop_time.sequence == sequence + 1 {
-                        let stop = self.engine.stop_by_id(&stop_time.stop_id).unwrap();
-                        let node = Node::from_stop_time(&node, stop, stop_time, &self.end);
-                        let cost = node.cost();
-                        if cost < self.best_cost[stop.index] {
-                            self.best_cost[stop.index] = cost;
-                            self.heap.push(node.into());
-                        }
-                        break;
+                    if stop_time.sequence != sequence + 1 {
+                        continue;
                     }
+                    let stop = &self.engine.stops[stop_time.stop_idx];
+                    let to_node = Node::from_stop_time(from_node, stop, stop_time, &self.end);
+                    let cost = to_node.cost();
+                    // If it's worth to explore it
+                    if cost < self.best_cost[stop.index] {
+                        self.best_cost[stop.index] = cost;
+                        let node: NodeRef = to_node.into();
+                        self.heap.push(node.clone());
+
+                        // We also want to explore transfers
+                        if let Some(transfers) =
+                            self.engine.transfers_by_stop_id(&stop_time.stop_id)
+                        {
+                            transfers.iter().for_each(|transfer| {
+                                let tran_stop = &self.engine.stops[transfer.to_stop_idx];
+                                let tran_node =
+                                    Node::from_transfer(&node, tran_stop, transfer, &self.end);
+                                let cost = tran_node.cost();
+                                if cost < self.best_cost[stop.index] {
+                                    self.best_cost[stop.index] = cost;
+                                    let t_node: NodeRef = tran_node.into();
+                                    self.heap.push(t_node);
+                                }
+                            });
+                        }
+                    }
+                    break;
                 }
-                // We also want to try to
             }
             Transition::Walk => {
                 // If the transition was a walk we need to hop on to a transfer
-                let stop = &self.engine.stops[node.stop_idx.unwrap()];
+                let stop = &self.engine.stops[from_node.stop_idx.unwrap()];
                 self.engine
                     .trips_by_stop_id(&stop.id)
                     .unwrap()
@@ -212,19 +238,54 @@ impl Router {
                     });
             }
             Transition::Transfer {
-                from_trip_idx,
+                from_stop_idx,
+                to_stop_idx,
                 to_trip_idx,
-            } => todo!(),
+            } => {
+                if let Some(to_trip_idx) = to_trip_idx {
+                    // Here we can just start by traveling down the trip
+                    let trip = &self.engine.trips[to_trip_idx];
+                    let stop_times = self.engine.stop_times_by_trip_id(&trip.id).unwrap();
+                    let mut sequence = usize::MAX;
+                    // Find the current sequence id
+                    for stop_time in stop_times.iter() {
+                        if stop_time.stop_idx != to_stop_idx {
+                            continue;
+                        }
+                        sequence = stop_time.sequence;
+                        break;
+                    }
+
+                    for stop_time in stop_times.iter() {
+                        if stop_time.sequence != sequence + 1 {
+                            continue;
+                        }
+                        let stop = &self.engine.stops[stop_time.stop_idx];
+                        let node = Node::from_stop_time(&from_node, stop, stop_time, &self.end);
+                        let cost = node.cost();
+                        // If it's worth to explore it
+                        if cost < self.best_cost[stop.index] {
+                            self.best_cost[stop.index] = cost;
+                            let node: NodeRef = node.into();
+                            self.heap.push(node.clone());
+                        }
+                        break;
+                    }
+                } else {
+                    // Here we need to find a trip
+                    println!("WE GOT A NON ISH TRIP")
+                }
+            }
             Transition::Genesis => todo!(),
         }
     }
 
     fn node_to_str(&self, node: &NodeRef) -> String {
         let prefix = match node.transition {
-            Transition::Travel { .. } => format!("Travel to"),
-            Transition::Walk => format!("Walk to"),
-            Transition::Transfer { .. } => format!("Transfer to"),
-            Transition::Genesis => format!("START/END from"),
+            Transition::Travel { .. } => "Travel to".to_string(),
+            Transition::Walk => "Walk to".to_string(),
+            Transition::Transfer { .. } => "Transfer to".to_string(),
+            Transition::Genesis => "START/END from".to_string(),
         };
         let name = match node.stop_idx {
             Some(stop_idx) => format!("{}", self.engine.stops[stop_idx].name),

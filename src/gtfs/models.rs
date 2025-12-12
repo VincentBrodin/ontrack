@@ -55,7 +55,7 @@ pub struct GtfsTransfer {
     pub from_stop_id: String,
     pub to_stop_id: String,
     pub transfer_type: String,
-    pub min_transfer_time: Option<String>,
+    pub min_transfer_time: Option<usize>,
     pub from_trip_id: Option<String>,
     pub to_trip_id: Option<String>,
 }

@@ -10,10 +10,12 @@ pub mod search;
 mod area;
 mod stop;
 mod stop_time;
+mod transfer;
 mod trip;
 pub use area::*;
 pub use stop::*;
 pub use stop_time::*;
+pub use transfer::*;
 pub use trip::*;
 
 use crate::{
@@ -47,16 +49,18 @@ pub struct Engine {
     pub areas: Arc<[Area]>,
     pub trips: Arc<[Trip]>,
     pub stop_times: Arc<[StopTime]>,
+    pub transfers: Arc<[Transfer]>,
 
     // Lookup tables
     stop_lookup: Arc<IdToIndex>,
     stop_distance_lookup: Arc<CellToIds>,
     area_lookup: Arc<IdToIndex>,
-    trip_lookup: Arc<IdToIndex>,
-    trip_to_stop_times: Arc<IdToIndexes>,
-    stop_to_trips: Arc<IdToIds>,
     area_to_stops: Arc<IdToIds>,
     stop_to_area: Arc<IdToId>,
+    stop_to_transfers: Arc<IdToIndexes>,
+    stop_to_trips: Arc<IdToIds>,
+    trip_lookup: Arc<IdToIndex>,
+    trip_to_stop_times: Arc<IdToIndexes>,
 }
 
 impl Engine {
@@ -132,6 +136,62 @@ impl Engine {
         self.trips = trips.into();
         self.trip_lookup = trip_lookup.into();
         println!("Trips done");
+
+        // Loading in transfers
+        let mut transfers: Vec<Transfer> = Vec::new();
+        let mut stop_to_transfers: HashMap<Arc<str>, Vec<usize>> = HashMap::new();
+        gtfs.stream_transfers(|(i, transfer)| {
+            let from_stop_idx = *self
+                .stop_lookup
+                .get(transfer.from_stop_id.as_str())
+                .unwrap();
+            let from_stop = &self.stops[from_stop_idx];
+
+            let to_stop_idx = *self.stop_lookup.get(transfer.to_stop_id.as_str()).unwrap();
+            let to_stop = &self.stops[to_stop_idx];
+
+            let (from_trip_id, from_trip_idx) = if let Some(trip_id) = transfer.from_trip_id {
+                let trip_idx = *self.trip_lookup.get(trip_id.as_str()).unwrap();
+                let trip_id = self.trips[trip_idx].id.clone();
+                (Some(trip_id), Some(trip_idx))
+            } else {
+                (None, None)
+            };
+
+            let (to_trip_id, to_trip_idx) = if let Some(trip_id) = transfer.to_trip_id {
+                let trip_idx = *self.trip_lookup.get(trip_id.as_str()).unwrap();
+                let trip_id = self.trips[trip_idx].id.clone();
+                (Some(trip_id), Some(trip_idx))
+            } else {
+                (None, None)
+            };
+
+            stop_to_transfers
+                .entry(from_stop.id.clone())
+                .or_default()
+                .push(i);
+
+            let value = Transfer {
+                from_stop_id: from_stop.id.clone(),
+                from_stop_idx,
+                to_stop_id: to_stop.id.clone(),
+                to_stop_idx,
+                from_trip_id,
+                from_trip_idx,
+                to_trip_id,
+                to_trip_idx,
+                min_transfer_time: transfer.min_transfer_time,
+            };
+
+            transfers.push(value);
+        })?;
+        self.transfers = transfers.into();
+        let stop_to_transfers: IdToIndexes = stop_to_transfers
+            .into_iter()
+            .map(|(key, value)| (key, value.into()))
+            .collect();
+        self.stop_to_transfers = stop_to_transfers.into();
+        println!("Transfers done");
 
         // Build stop_time data set
         let mut trip_to_stop_times: HashMap<Arc<str>, Vec<usize>> = HashMap::new();
@@ -235,6 +295,17 @@ impl Engine {
     pub fn area_by_stop_id(&self, stop_id: &str) -> Option<&Area> {
         let area_id = self.stop_to_area.get(stop_id)?;
         self.area_by_id(area_id)
+    }
+
+    /// Get all the possible transfers from a stop
+    pub fn transfers_by_stop_id(&self, stop_id: &str) -> Option<Vec<&Transfer>> {
+        let transfers = self.stop_to_transfers.get(stop_id)?;
+        Some(
+            transfers
+                .iter()
+                .map(|index| &self.transfers[*index])
+                .collect(),
+        )
     }
 
     /// Gets a trip with the given id.
