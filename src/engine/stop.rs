@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::{engine::Identifiable, gtfs::models::GtfsStop};
+use crate::{
+    engine::{Identifiable, geo::Coordinate},
+    gtfs::models::GtfsStop,
+};
 
 #[derive(Debug, Default, Clone)]
 pub enum LocationType {
@@ -18,11 +21,11 @@ pub enum LocationType {
 
 #[derive(Debug, Default, Clone)]
 pub struct Stop {
+    pub index: usize,
     pub id: Arc<str>,
     pub name: Arc<str>,
     pub normalized_name: Arc<str>,
-    pub latitude: f64,
-    pub longitude: f64,
+    pub coordinate: Coordinate,
     pub location_type: LocationType,
 }
 
@@ -63,11 +66,14 @@ impl From<GtfsStop> for Stop {
         };
 
         Self {
+            index: usize::MAX,
             id: value.stop_id.into(),
             name: value.stop_name.clone().into(),
             normalized_name: value.stop_name.to_lowercase().into(),
-            latitude: value.stop_lat,
-            longitude: value.stop_lon,
+            coordinate: Coordinate {
+                latitude: value.stop_lat,
+                longitude: value.stop_lon,
+            },
             location_type,
         }
     }
