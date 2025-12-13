@@ -65,6 +65,7 @@ impl Router {
                     g_distance: Default::default(),
                     g_time: 0,
                     h_distance: Default::default(),
+                    penalties: 0,
                     transition: Transition::Genesis,
                     parent: None,
                 })
@@ -76,6 +77,7 @@ impl Router {
                 g_distance: Default::default(),
                 g_time: 0,
                 h_distance: Default::default(),
+                penalties: 0,
                 transition: Transition::Genesis,
                 parent: None,
             }),
@@ -94,6 +96,7 @@ impl Router {
                     g_distance: Default::default(),
                     g_time: 0,
                     h_distance: distance,
+                    penalties: 0,
                     transition: Transition::Genesis,
                     parent: None,
                 })
@@ -105,6 +108,7 @@ impl Router {
                 g_distance: Default::default(),
                 g_time: 0,
                 h_distance: coordinate.distance(&end.coordinate),
+                penalties: 0,
                 transition: Transition::Genesis,
                 parent: None,
             }),
@@ -145,9 +149,9 @@ impl Router {
                 return Ok(route);
             }
             self.add_neigbours(&state);
-            // if state.transition != Transition::Walk {
-            //     self.add_walk_neigbours(&state);
-            // }
+            if state.transition != Transition::Walk {
+                self.add_walk_neigbours(&state);
+            }
         }
         Err(self::Error::NoRouteFound)
     }

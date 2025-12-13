@@ -33,6 +33,8 @@ pub struct SearchState {
     pub g_time: usize,
     // The distance we still need to travel
     pub h_distance: Distance,
+    // This allows us to modify how harshly we look at transfers and walking
+    pub penalties: usize,
     pub transition: Transition,
     pub parent: Option<SearchStateRef>,
 }
@@ -41,6 +43,13 @@ impl SearchState {
     pub fn from_coordinate(from: &SearchStateRef, to: &Stop, end: &SearchStateRef) -> Self {
         let distance = from.coordinate.distance(&to.coordinate);
         let time_to_walk = time_to_walk(&distance);
+
+        let switch_penalty = if let Transition::Travel { .. } = from.transition {
+            1
+        } else {
+            0
+        };
+
         Self {
             stop_idx: Some(to.index),
             coordinate: to.coordinate,
@@ -48,6 +57,7 @@ impl SearchState {
             g_distance: from.g_distance + distance,
             g_time: from.g_time + time_to_walk,
             h_distance: to.coordinate.distance(&end.coordinate),
+            penalties: from.penalties + switch_penalty,
             transition: Transition::Walk,
             parent: Some(from.clone()),
         }
@@ -61,6 +71,13 @@ impl SearchState {
     ) -> Self {
         let distance = from.coordinate.distance(&to.coordinate);
         let time_to_transfer = transfer.min_transfer_time.unwrap_or(0) + time_to_walk(&distance);
+
+        let switch_penalty = if let Transition::Travel { .. } = from.transition {
+            1
+        } else {
+            0
+        };
+
         Self {
             stop_idx: Some(to.index),
             coordinate: to.coordinate,
@@ -68,6 +85,7 @@ impl SearchState {
             g_distance: from.g_distance + distance,
             g_time: from.g_time + time_to_transfer,
             h_distance: to.coordinate.distance(&end.coordinate),
+            penalties: from.penalties + switch_penalty,
             transition: Transition::Transfer {
                 from_stop_idx: transfer.from_stop_idx,
                 to_stop_idx: transfer.to_stop_idx,
@@ -105,13 +123,23 @@ impl SearchState {
             _ => from.coordinate.distance(&to.coordinate),
         };
 
+        let switch_penalty = if matches!(
+            from.transition,
+            Transition::Walk | Transition::Transfer { .. } | Transition::Genesis
+        ) {
+            1
+        } else {
+            0
+        };
+
         Self {
             stop_idx: Some(to.index),
             coordinate: to.coordinate,
             current_time: arrival_time,
-            g_distance: dist_delta,
+            g_distance: from.g_distance + dist_delta,
             g_time: from.g_time + (arrival_time - from.current_time),
             h_distance: to.coordinate.distance(&end.coordinate),
+            penalties: from.penalties + switch_penalty,
             transition: Transition::Travel {
                 trip_idx: new_stop_time.trip_idx,
                 sequence: new_stop_time.sequence,
@@ -134,14 +162,7 @@ impl SearchState {
         // 2. Base Cost: Total Time (G + H)
         // This makes "Faster" the primary goal.
         let time_cost = self.g_time + h_time;
-
-        // 3. Distance Penalty (Tie-Breaker for "Shorter")
-        // We add a tiny cost for distance to favor shorter routes when times are similar.
-        // e.g., 0.01 means 1 km of travel adds 10 seconds of "virtual cost".
-        // This prevents the router from taking a massive detour just to save 1 second.
-        let distance_penalty = (self.g_distance.as_meters() * 0.01) as usize;
-
-        time_cost + distance_penalty
+        time_cost + (self.penalties * 256)
     }
 }
 impl Eq for SearchState {}
